@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
+    "pull": "git pull && pm2 restart 1",
     "start": "pm2 start app.js"
   },
   "dependencies": {
