@@ -1,0 +1,12 @@
+openapi: 3.0.2
+info:
+  title: API Title
+  version: '1.0'
+paths:
+  /classes:
+    get:
+      description: Get Classes
+      responses:
+        '200':
+          description: OK
+
