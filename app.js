@@ -3,6 +3,7 @@ const express = require("express");
 const indexRouter = require("./routes/index");
 const coursesRouter = require("./routes/courses");
 const classesRouter = require("./routes/classes");
+const partsRouter = require("./routes/parts");
 
 const port = 8080;
 const app = express();
@@ -13,6 +14,7 @@ app.use(express.urlencoded({ extended: false }));
 app.use("/", indexRouter);
 app.use("/courses", coursesRouter);
 app.use("/classes", classesRouter);
+app.use("/parts", partsRouter);
 
 app.use(function (req, res, next) {
   res.status(404).send("Not Found");
