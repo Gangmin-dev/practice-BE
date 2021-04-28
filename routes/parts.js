@@ -23,6 +23,9 @@ router.get("/", function (req, res, next) {
   if (!req.query) {
     res.status(400).send("there is no queryString");
   }
+  if (!req.query.course_id) {
+    res.status(400).send("there is no course_id query data");
+  }
   db.query(
     `SELECT id, number, title FROM chapter WHERE course_id = ?`,
     [req.query.course_id],
@@ -31,10 +34,12 @@ router.get("/", function (req, res, next) {
         console.log(err);
         next(err);
       }
-      Promise.all(chapters.map((chapter) => fetchParts(chapter))).then((v) => {
-        console.log(chapters);
-        res.status(200).json(chapters);
-      });
+      Promise.all(chapters.map((chapter) => fetchParts(chapter)))
+        .then((v) => {
+          console.log(chapters);
+          res.status(200).json(chapters);
+        })
+        .catch(next);
     }
   );
 });
