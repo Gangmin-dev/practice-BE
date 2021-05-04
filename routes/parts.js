@@ -1,9 +1,8 @@
 const express = require("express");
 const router = express.Router();
-const db = require("../lib/db");
 const query = require("../lib/query_with_tracing");
 const initTracer = require(".././lib/tracing").initTracer;
-const { Tags, FORMAT_HTTP_HEADERS } = require("opentracing");
+const { Tags } = require("opentracing");
 
 const tracer = initTracer("parts-api");
 
@@ -133,20 +132,24 @@ router.get("/oneQuery", function (req, res, next) {
     return res.status(400).send("there is no course_id query data");
   }
 
-  db.query(
+  query(
     `SELECT chapter.id, chapter.number, chapter.title, part.id as partId, part.title as partTitle FROM chapter
     LEFT JOIN part ON part.chapter_id = chapter.id
     WHERE chapter.course_id = ?
     ORDER BY chapter.number`,
     [req.query.course_id],
-    (err, chaptersWithParts) => {
-      if (err) {
-        console.log(err);
-        next(err);
-      }
+    span
+  )
+    .then((chaptersWithParts) => {
+      span.log({
+        event: "get-cahpters-with-parts-success",
+        value: chaptersWithParts,
+      });
+
       let chapters = [];
       let lastIndex = -1;
       let currentChapterIndex;
+
       for (let i = 0; i < chaptersWithParts.length; i++) {
         if (
           i === 0 ||
@@ -159,6 +162,10 @@ router.get("/oneQuery", function (req, res, next) {
               title: chaptersWithParts[i].title,
               parts: [],
             }) - 1;
+          span.log({
+            event: "change-chapter-id",
+            value: chaptersWithParts[i].id,
+          });
         }
         chapters[currentChapterIndex].parts.push({
           id: chaptersWithParts[i].partId,
@@ -166,9 +173,19 @@ router.get("/oneQuery", function (req, res, next) {
         });
         lastIndex = i;
       }
+
+      span.log({
+        event: "match-chapters-with-parts-success",
+        value: chapters,
+      });
+      span.finish();
+
       res.status(200).json(chapters);
-    }
-  );
+    })
+    .catch((e) => {
+      logDatabaseError(e, span);
+      res.status(500).send(e);
+    });
 });
 
 function logDatabaseError(e, span) {
