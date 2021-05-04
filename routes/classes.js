@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const db = require("./../module/db");
+const db = require("./../lib/db");
 
 router.get("/", function (req, res, next) {
   if (!req.query) {

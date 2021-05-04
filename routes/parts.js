@@ -1,6 +1,10 @@
 const express = require("express");
 const router = express.Router();
-const db = require("../module/db");
+const db = require("../lib/db");
+const initTracer = require("../../lib/tracing").initTracer;
+const { Tags, FORMAT_HTTP_HEADERS } = require("opentracing");
+
+const tracer = initTracer("parts-api");
 
 const fetchParts = (chapter) =>
   new Promise((resolve, reject) => {
@@ -20,10 +24,11 @@ const fetchParts = (chapter) =>
   });
 
 router.get("/", function (req, res, next) {
-  if (!req.query) {
-    res.status(400).send("there is no queryString");
-  }
+  const span = tracer.startSpan("use-promise");
   if (!req.query.course_id) {
+    span.setTag(Tags.ERROR, true);
+    span.setTag(Tags.HTTP_STATUS_CODE, 400);
+    span.finish();
     res.status(400).send("there is no course_id query data");
   }
   db.query(
@@ -45,10 +50,11 @@ router.get("/", function (req, res, next) {
 });
 
 router.get("/twoQuery", function (req, res, next) {
-  if (!req.query) {
-    res.status(400).send("there is no queryString");
-  }
+  const span = tracer.startSpan("use-two-query");
   if (!req.query.course_id) {
+    span.setTag(Tags.ERROR, true);
+    span.setTag(Tags.HTTP_STATUS_CODE, 400);
+    span.finish();
     res.status(400).send("there is no course_id query data");
   }
   db.query(
@@ -83,10 +89,11 @@ router.get("/twoQuery", function (req, res, next) {
 });
 
 router.get("/oneQuery", function (req, res, next) {
-  if (!req.query) {
-    res.status(400).send("there is no queryString");
-  }
+  const span = tracer.startSpan("use-one-query");
   if (!req.query.course_id) {
+    span.setTag(Tags.ERROR, true);
+    span.setTag(Tags.HTTP_STATUS_CODE, 400);
+    span.finish();
     res.status(400).send("there is no course_id query data");
   }
   db.query(
