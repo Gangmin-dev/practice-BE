@@ -25,19 +25,6 @@ const fetchParts = (chapter, rootSpan) => {
         logDatabaseError(e, span);
         return reject(e);
       });
-    // db.query(
-    //   `SELECT id, title FROM part WHERE chapter_id = ?`,
-    //   [chapter.id],
-    //   (err, parts) => {
-    //     if (err) {
-    //       console.log(err);
-    //       return reject(err);
-    //     }
-    //     chapter.parts = parts;
-
-    //     resolve(parts);
-    //   }
-    // );
   });
 };
 
@@ -55,7 +42,7 @@ router.get("/", function (req, res, next) {
   )
     .then((chapters) => {
       span.log({
-        event: "get-chapters",
+        event: "get-chapters-success",
         value: chapters,
       });
 
@@ -77,67 +64,73 @@ router.get("/", function (req, res, next) {
       logDatabaseError(e, span);
       res.status(500).send(e);
     });
-  // db.query(
-  //   `SELECT id, number, title FROM chapter WHERE course_id = ?`,
-  //   [req.query.course_id],
-  //   (err, chapters) => {
-  //     if (err) {
-  //       console.log(err);
-  //       next(err);
-  //     }
-  //     Promise.all(chapters.map((chapter) => fetchParts(chapter)))
-  //       .then((v) => {
-  //         console.log(chapters);
-  //         res.status(200).json(chapters);
-  //       })
-  //       .catch(next);
-  //   }
-  // );
 });
 
 router.get("/twoQuery", function (req, res, next) {
   const span = tracer.startSpan("use-two-query");
 
   if (checkQueryString(req, span)) {
-    res.status(400).send("there is no course_id query data");
+    return res.status(400).send("there is no course_id query data");
   }
 
-  db.query(
+  query(
     `SELECT id, number, title FROM chapter WHERE course_id = ?`,
     [req.query.course_id],
-    (err, chapters) => {
-      if (err) {
-        console.log(err);
-        next(err);
-      }
-      db.query(
+    span
+  )
+    .then((chapters) => {
+      span.log({
+        event: "get-chapters-success",
+        value: chapters,
+      });
+
+      const fetchPartsSpan = tracer.startSpan("fetch-parts", {
+        childOf: span.context(),
+      });
+
+      query(
         `SELECT id, title, chapter_id FROM part WHERE chapter_id in (SELECT id FROM chapter WHERE course_id = ?)`,
         [req.query.course_id],
-        (err, parts) => {
-          if (err) {
-            console.log(err);
-            next(err);
-          }
-          console.log(parts);
+        fetchPartsSpan
+      )
+        .then((parts) => {
+          fetchPartsSpan.log({
+            event: "fetch-parts-success",
+            value: parts,
+          });
+
           chapters.forEach((chapter) => {
             chapter.parts = [];
             parts.forEach((part) => {
               if (part.chapter_id === chapter.id)
                 chapter.parts.push({ id: part.id, title: part.title });
             });
+
+            fetchPartsSpan.log({
+              event: `attach-parts-to-chapter`,
+              value: chapter,
+            });
           });
+          fetchPartsSpan.finish();
+          span.finish();
           res.status(200).json(chapters);
-        }
-      );
-    }
-  );
+        })
+        .catch((e) => {
+          logDatabaseError(e, span);
+          res.status(500).send(e);
+        });
+    })
+    .catch((e) => {
+      logDatabaseError(e, span);
+      res.status(500).send(e);
+    });
 });
 
 router.get("/oneQuery", function (req, res, next) {
   const span = tracer.startSpan("use-one-query");
 
   if (checkQueryString(req, span)) {
-    res.status(400).send("there is no course_id query data");
+    return res.status(400).send("there is no course_id query data");
   }
 
   db.query(
