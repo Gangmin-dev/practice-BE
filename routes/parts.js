@@ -3,6 +3,7 @@ const router = express.Router();
 const query = require("../lib/query_with_tracing");
 const initTracer = require(".././lib/tracing").initTracer;
 const { Tags } = require("opentracing");
+const pool = require("../lib/db");
 
 const tracer = initTracer("parts-api");
 
@@ -14,7 +15,7 @@ const fetchParts = (chapter, rootSpan) => {
       .then((parts) => {
         span.log({
           event: "get-parts-success",
-          value: parts,
+          // value: parts,
         });
         chapter.parts = parts;
         span.finish();
@@ -27,7 +28,9 @@ const fetchParts = (chapter, rootSpan) => {
   });
 };
 
-router.get("/", function (req, res, next) {
+router.get("/", async function (req, res, next) {
+  await insertDummyData(req);
+
   const span = tracer.startSpan("use-promise");
 
   if (checkQueryString(req, span)) {
@@ -42,16 +45,19 @@ router.get("/", function (req, res, next) {
     .then((chapters) => {
       span.log({
         event: "get-chapters-success",
-        value: chapters,
+        // value: chapters,
       });
 
       Promise.all(chapters.map((chapter) => fetchParts(chapter, span)))
         .then((v) => {
           span.log({
             event: "fetch-parts-success",
-            value: chapters,
+            // value: chapters,
           });
           span.finish();
+
+          deleteDummyData();
+
           res.status(200).json(chapters);
         })
         .catch((e) => {
@@ -65,7 +71,9 @@ router.get("/", function (req, res, next) {
     });
 });
 
-router.get("/twoQuery", function (req, res, next) {
+router.get("/twoQuery", async function (req, res, next) {
+  await insertDummyData(req);
+
   const span = tracer.startSpan("use-two-query");
 
   if (checkQueryString(req, span)) {
@@ -80,7 +88,7 @@ router.get("/twoQuery", function (req, res, next) {
     .then((chapters) => {
       span.log({
         event: "get-chapters-success",
-        value: chapters,
+        // value: chapters,
       });
 
       const fetchPartsSpan = tracer.startSpan("fetch-parts", {
@@ -95,7 +103,7 @@ router.get("/twoQuery", function (req, res, next) {
         .then((parts) => {
           fetchPartsSpan.log({
             event: "fetch-parts-success",
-            value: parts,
+            // value: parts,
           });
 
           chapters.forEach((chapter) => {
@@ -107,11 +115,14 @@ router.get("/twoQuery", function (req, res, next) {
 
             fetchPartsSpan.log({
               event: `attach-parts-to-chapter`,
-              value: chapter,
+              // value: chapter,
             });
           });
           fetchPartsSpan.finish();
           span.finish();
+
+          deleteDummyData();
+
           res.status(200).json(chapters);
         })
         .catch((e) => {
@@ -125,7 +136,9 @@ router.get("/twoQuery", function (req, res, next) {
     });
 });
 
-router.get("/oneQuery", function (req, res, next) {
+router.get("/oneQuery", async function (req, res, next) {
+  await insertDummyData(req);
+
   const span = tracer.startSpan("use-one-query");
 
   if (checkQueryString(req, span)) {
@@ -143,7 +156,7 @@ router.get("/oneQuery", function (req, res, next) {
     .then((chaptersWithParts) => {
       span.log({
         event: "get-cahpters-with-parts-success",
-        value: chaptersWithParts,
+        // value: chaptersWithParts,
       });
 
       let chapters = [];
@@ -176,10 +189,10 @@ router.get("/oneQuery", function (req, res, next) {
 
       span.log({
         event: "match-chapters-with-parts-success",
-        value: chapters,
+        // value: chapters,
       });
       span.finish();
-
+      deleteDummyData();
       res.status(200).json(chapters);
     })
     .catch((e) => {
@@ -196,6 +209,7 @@ function logDatabaseError(e, span) {
     "error.object": e,
   });
   span.finish();
+  deleteDummyData();
 }
 
 function checkQueryString(req, span) {
@@ -207,10 +221,54 @@ function checkQueryString(req, span) {
       queryString: req.query,
     });
     span.finish();
-
+    deleteDummyData();
     return 1;
   }
   return 0;
+}
+
+async function insertDummyData(req) {
+  nInsertChapter = parseInt(req.query.insert_chapter_num);
+  nInsertPart = parseInt(req.query.insert_part_num);
+  courseId = req.query.course_id;
+
+  if (nInsertChapter && nInsertPart && courseId) {
+    let chapterValues = [];
+
+    for (let i = 0; i < nInsertChapter; i++) {
+      chapterValues.push([courseId, "dummyData", i]);
+    }
+
+    await pool
+      .query(`INSERT INTO chapter (course_id, title, number) VALUES ?`, [
+        chapterValues,
+      ])
+      .then((insertInfo) => {
+        firstId = insertInfo[0].insertId;
+        console.log(insertInfo.insertId);
+        let partValues = [];
+
+        for (let i = firstId; i < firstId + nInsertChapter; i++) {
+          for (let k = 0; k < nInsertPart; k++) {
+            partValues.push(["dummyPart", i]);
+          }
+        }
+        console.log(partValues);
+        pool.query(`INSERT INTO part (title, chapter_id) VALUES ?`, [
+          partValues,
+        ]);
+      });
+  }
+}
+
+function deleteDummyData() {
+  pool.query(`DELETE FROM part WHERE id > 24`).then((v) => {
+    console.log(v);
+    pool
+      .query(`DELETE FROM chapter WHERE id > 9`)
+      .then()
+      .catch((e) => console.log);
+  });
 }
 
 module.exports = router;
