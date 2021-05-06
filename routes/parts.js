@@ -149,7 +149,7 @@ router.get("/oneQuery", async function (req, res, next) {
     `SELECT chapter.id, chapter.number, chapter.title, part.id as partId, part.title as partTitle FROM chapter
     LEFT JOIN part ON part.chapter_id = chapter.id
     WHERE chapter.course_id = ?
-    ORDER BY chapter.number`,
+    ORDER BY chapter.id`,
     [req.query.course_id],
     span
   )
@@ -243,7 +243,7 @@ async function insertDummyData(req) {
       .query(`INSERT INTO chapter (course_id, title, number) VALUES ?`, [
         chapterValues,
       ])
-      .then((insertInfo) => {
+      .then(async (insertInfo) => {
         firstId = insertInfo[0].insertId;
         console.log(insertInfo.insertId);
         let partValues = [];
@@ -253,10 +253,11 @@ async function insertDummyData(req) {
             partValues.push(["dummyPart", i]);
           }
         }
-        console.log(partValues);
-        pool.query(`INSERT INTO part (title, chapter_id) VALUES ?`, [
-          partValues,
-        ]);
+
+        await pool
+          .query(`INSERT INTO part (title, chapter_id) VALUES ?`, [partValues])
+          .then()
+          .catch((e) => console.log);
       });
   }
 }
