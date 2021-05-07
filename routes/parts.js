@@ -113,10 +113,10 @@ router.get("/twoQuery", async function (req, res, next) {
                 chapter.parts.push({ id: part.id, title: part.title });
             });
 
-            fetchPartsSpan.log({
-              event: `attach-parts-to-chapter`,
-              // value: chapter,
-            });
+            // fetchPartsSpan.log({
+            //   event: `attach-parts-to-chapter`,
+            //   value: chapter,
+            // });
           });
           fetchPartsSpan.finish();
           span.finish();
@@ -175,10 +175,10 @@ router.get("/oneQuery", async function (req, res, next) {
               title: chaptersWithParts[i].title,
               parts: [],
             }) - 1;
-          span.log({
-            event: "change-chapter-id",
-            value: chaptersWithParts[i].id,
-          });
+          // span.log({
+          //   event: "change-chapter-id",
+          //   value: chaptersWithParts[i].id,
+          // });
         }
         chapters[currentChapterIndex].parts.push({
           id: chaptersWithParts[i].partId,
