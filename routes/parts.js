@@ -81,7 +81,7 @@ router.get("/twoQuery", async function (req, res, next) {
   }
 
   query(
-    `SELECT id, number, title FROM chapter WHERE course_id = ?`,
+    `SELECT id, number, title FROM chapter WHERE course_id = ? ORDER BY id`,
     [req.query.course_id],
     span
   )
@@ -96,7 +96,7 @@ router.get("/twoQuery", async function (req, res, next) {
       });
 
       query(
-        `SELECT id, title, chapter_id FROM part WHERE chapter_id in (SELECT id FROM chapter WHERE course_id = ?)`,
+        `SELECT id, title, chapter_id FROM part WHERE chapter_id in (SELECT id FROM chapter WHERE course_id = ?) ORDER BY chapter_id`,
         [req.query.course_id],
         fetchPartsSpan
       )
@@ -106,18 +106,34 @@ router.get("/twoQuery", async function (req, res, next) {
             // value: parts,
           });
 
-          chapters.forEach((chapter) => {
-            chapter.parts = [];
-            parts.forEach((part) => {
-              if (part.chapter_id === chapter.id)
-                chapter.parts.push({ id: part.id, title: part.title });
-            });
+          let currentChapterIndex = 0;
+          chapters[0].part = [];
 
-            // fetchPartsSpan.log({
-            //   event: `attach-parts-to-chapter`,
-            //   value: chapter,
-            // });
+          for (let i = 0; i < parts.length; i++) {
+            if (chapters[currentChapterIndex].id != parts[i].chapter_id) {
+              chapters[++currentChapterIndex].part = [];
+            }
+            chapters[currentChapterIndex].part.push({
+              id: parts[i].id,
+              title: parts[i].title,
+            });
+          }
+
+          fetchPartsSpan.log({
+            event: "attach-parts-success",
           });
+          // chapters.forEach((chapter) => {
+          //   chapter.parts = [];
+          //   parts.forEach((part) => {
+          //     if (part.chapter_id === chapter.id)
+          //       chapter.parts.push({ id: part.id, title: part.title });
+          //   });
+
+          //   fetchPartsSpan.log({
+          //     event: `attach-parts-to-chapter`,
+          //     value: chapter,
+          //   });
+          // });
           fetchPartsSpan.finish();
           span.finish();
 
